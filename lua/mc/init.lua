@@ -1,5 +1,5 @@
 -- local P = require "yacine.utils.P".P
---local highlight = require "mc.highlight"
+local highlight = require "mc.highlight"
 
 local api = vim.api
 local cns = api.nvim_create_namespace
@@ -20,79 +20,77 @@ local map = vim.keymap
 -- =====================
 -- === Multi Cursor  ===
 -- =====================
-local MC = {}
-MC.ns = cns('MC-Mode')
-MC.stack = {}
+local M = {}
+M.ns = cns('MC-Mode')
+M.stack = {}
 
--- hl(0, "MCCursor", { fg = "#242b38", bg = "#ef5f6b", bold = true })
+M.cursor = {}
 
-MC.cursor = {}
-
-MC.cursor.set = function(buf, id, row, col)
+M.cursor.set = function(buf, id, row, col)
   if not buf or buf == 0 then
     buf = bufnr()
   end
 
-  if not MC.stack[buf] then
-    MC.stack[buf] = {}
+  if not M.stack[buf] then
+    M.stack[buf] = {}
   end
 
-  if MC.cursor.id(buf, row, col) then return end
+  if M.cursor.id(buf, row, col) then return end
 
   local chr = get_text(buf, row, col, row, col + 1, {})[1]
   if chr == "" then chr = " " end
 
-  id = extmark(buf, MC.ns, row, col, {
+  id = extmark(buf, M.ns, row, col, {
     id = id,
     virt_text = { { chr, "MCCursor" } },
     virt_text_pos = "overlay",
   })
 
-  MC.stack[buf][id] = { row = row, col = col }
+  M.stack[buf][id] = { row = row, col = col }
 end
 
-MC.cursor.del = function(buf, id, row, col)
-  if not MC.stack[buf] then return end
+M.cursor.del = function(buf, id, row, col)
+  if not M.stack[buf] then return end
 
-  id = id or MC.cursor.id(buf, row, col)
+  id = id or M.cursor.id(buf, row, col)
   if not id then return end
 
-  del_extmark(buf, MC.ns, id)
-  MC.stack[buf][id] = nil
+  del_extmark(buf, M.ns, id)
+  M.stack[buf][id] = nil
 end
 
-MC.cursor.del_all = function(buf)
+M.cursor.del_all = function(buf)
   if not buf or buf == 0 then
     buf = bufnr()
   end
 
-  api.nvim_buf_clear_namespace(buf, MC.ns, 0, -1)
-  MC.stack[buf] = nil
+  api.nvim_buf_clear_namespace(buf, M.ns, 0, -1)
+  M.stack[buf] = nil
 end
 
-MC.cursor.id = function(buf, row, col)
-  if not MC.stack[buf] then return end
+M.cursor.id = function(buf, row, col)
+  if not M.stack[buf] then return end
 
-  for id, pos in pairs(MC.stack[buf]) do
+  for id, pos in pairs(M.stack[buf]) do
     if row == pos.row and col == pos.col then
       return id
     end
   end
 end
 
-MC.ref = function(buf)
+M.ref = function(buf)
   if not buf or buf == 0 then
     buf = bufnr()
   end
 
-  local stack = api.nvim_buf_get_extmarks(buf, MC.ns, 0, -1, {})
-  MC.cursor.del_all(buf)
+  local stack = api.nvim_buf_get_extmarks(buf, M.ns, 0, -1, {})
+  M.cursor.del_all(buf)
 
   for _, m in pairs(stack) do
     local id = m[1]
     local row = m[2]
     local col = m[3]
-    MC.cursor.set(buf, id, row, col)
+    M.cursor.set(buf, id, row, col)
   end
 end
 
@@ -101,25 +99,25 @@ end
 -- ===  Move Cursor  ===
 -- =====================
 
-MC.__DIR__ = {
+M.__DIR__ = {
   UP = 1,
   Down = 2,
   Right = 3,
   Left = 4
 }
 
-MC.cursor.move = function(buf, id, dir)
-  if not MC.stack[buf] then return end
-  if not MC.stack[buf][id] then return end
+M.cursor.move = function(buf, id, dir)
+  if not M.stack[buf] then return end
+  if not M.stack[buf][id] then return end
 
-  local pos = MC.stack[buf][id]
+  local pos = M.stack[buf][id]
   local row = pos.row
   local col = pos.col
 
-  if dir == MC.__DIR__.UP then row = row - 1 end
-  if dir == MC.__DIR__.Down then row = row + 1 end
-  if dir == MC.__DIR__.Right then col = col + 1 end
-  if dir == MC.__DIR__.Left then col = col - 1 end
+  if dir == M.__DIR__.UP then row = row - 1 end
+  if dir == M.__DIR__.Down then row = row + 1 end
+  if dir == M.__DIR__.Right then col = col + 1 end
+  if dir == M.__DIR__.Left then col = col - 1 end
 
   if row < 0 then row = 0 end
   local lastrow = vim.fn.line("$") - 1
@@ -130,21 +128,21 @@ MC.cursor.move = function(buf, id, dir)
   local lastcol = #vim.fn.getline(row + 1) - 1
   if col > lastcol then col = lastcol end
 
-  MC.cursor.del(buf, id)
-  MC.cursor.set(buf, id, row, col)
+  M.cursor.del(buf, id)
+  M.cursor.set(buf, id, row, col)
 
-  if dir == MC.__DIR__.UP or
-      dir == MC.__DIR__.Down then
-    MC.stack[buf][id].col = tmp_col
+  if dir == M.__DIR__.UP or
+      dir == M.__DIR__.Down then
+    M.stack[buf][id].col = tmp_col
   end
 
 end
 
-MC.cursor.move_all = function(buf, dir)
-  if not MC.stack[buf] then return end
+M.cursor.move_all = function(buf, dir)
+  if not M.stack[buf] then return end
 
-  for id, _ in pairs(MC.stack[buf]) do
-    MC.cursor.move(buf, id, dir)
+  for id, _ in pairs(M.stack[buf]) do
+    M.cursor.move(buf, id, dir)
   end
 end
 
@@ -153,7 +151,7 @@ end
 -- === USER COMMANDS ===
 -- =====================
 
-MC.setup = function()
+M.setup = function()
   ucmd("MCEnter", function()
     P "Enter MC"
   end, {})
@@ -167,7 +165,7 @@ MC.setup = function()
     local row = fn.line('.') - 1
     local col = fn.col('.') - 1
     P("Add: ", { buf, row, col })
-    MC.cursor.set(buf, nil, row, col)
+    M.cursor.set(buf, nil, row, col)
   end, {})
 
   ucmd("MCRemoveCursor", function()
@@ -175,7 +173,7 @@ MC.setup = function()
     local row = fn.line('.') - 1
     local col = fn.col('.') - 1
     P("Delete: ", { buf, row, col })
-    MC.cursor.del(buf, MC.cursor.id(buf, row, col))
+    M.cursor.del(buf, M.cursor.id(buf, row, col))
   end, {})
 
   ucmd("MCLockCursors", function()
@@ -185,22 +183,22 @@ MC.setup = function()
 
     map.set("n", "k", function()
       sc(fn.line(".") - 1, fn.col("."))
-      MC.cursor.move_all(buf, MC.__DIR__.UP)
+      M.cursor.move_all(buf, M.__DIR__.UP)
     end, { buffer = buf })
 
     map.set("n", "j", function()
       sc(fn.line(".") + 1, fn.col("."))
-      MC.cursor.move_all(buf, MC.__DIR__.Down)
+      M.cursor.move_all(buf, M.__DIR__.Down)
     end, { buffer = buf })
 
     map.set("n", "l", function()
       sc(fn.line("."), fn.col(".") + 1)
-      MC.cursor.move_all(buf, MC.__DIR__.Right)
+      M.cursor.move_all(buf, M.__DIR__.Right)
     end, { buffer = buf })
 
     map.set("n", "h", function()
       sc(fn.line("."), fn.col(".") - 1)
-      MC.cursor.move_all(buf, MC.__DIR__.Left)
+      M.cursor.move_all(buf, M.__DIR__.Left)
     end, { buffer = buf })
   end, {})
 
@@ -215,9 +213,9 @@ MC.setup = function()
     map.del("n", "l", { buffer = buf })
   end, {})
 
-  --highlight.create_highlight_groups()
+  highlight.create_highlight_groups()
 end
 
-return MC
+return M
 
 -- End
