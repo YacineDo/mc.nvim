@@ -1,5 +1,5 @@
-local P = require "yacine.utils.P".P
-local highlight = require "mc.highlight"
+-- local P = require "yacine.utils.P".P
+--local highlight = require "mc.highlight"
 
 local api = vim.api
 local cns = api.nvim_create_namespace
@@ -215,7 +215,7 @@ MC.setup = function()
     map.del("n", "l", { buffer = buf })
   end, {})
 
-  highlight.create_highlight_groups()
+  --highlight.create_highlight_groups()
 end
 
 return MC
