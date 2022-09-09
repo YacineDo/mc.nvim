@@ -184,14 +184,15 @@ local DIR = {
 }
 
 M.lock = function(bufnr)
-  map.set("n", "j", function()
-    fn.cursor(fn.line(".") + 1, fn.col("."))
-    move(DIR.Down, bufnr)
-  end, { buffer = bufnr })
 
   map.set("n", "k", function()
     fn.cursor(fn.line(".") - 1, fn.col("."))
     move(DIR.UP, bufnr)
+  end, { buffer = bufnr })
+
+  map.set("n", "j", function()
+    fn.cursor(fn.line(".") + 1, fn.col("."))
+    move(DIR.Down, bufnr)
   end, { buffer = bufnr })
 
   map.set("n", "l", function()
@@ -203,6 +204,26 @@ M.lock = function(bufnr)
     fn.cursor(fn.line("."), fn.col(".") - 1)
     move(DIR.Left, bufnr)
   end, { buffer = bufnr })
+
+  map.set("n", "<Up>", function()
+    fn.cursor(fn.line(".") - 1, fn.col("."))
+    move(DIR.UP, bufnr)
+  end, { buffer = bufnr })
+
+  map.set("n", "<Down>", function()
+    fn.cursor(fn.line(".") + 1, fn.col("."))
+    move(DIR.Down, bufnr)
+  end, { buffer = bufnr })
+
+  map.set("n", "<Right>", function()
+    fn.cursor(fn.line("."), fn.col(".") + 1)
+    move(DIR.Right, bufnr)
+  end, { buffer = bufnr })
+
+  map.set("n", "<Left>", function()
+    fn.cursor(fn.line("."), fn.col(".") - 1)
+    move(DIR.Left, bufnr)
+  end, { buffer = bufnr })
 end
 
 M.unlock = function(bufnr)
@@ -210,6 +231,10 @@ M.unlock = function(bufnr)
   pcall(map.del, "n", "j", { buffer = bufnr })
   pcall(map.del, "n", "h", { buffer = bufnr })
   pcall(map.del, "n", "l", { buffer = bufnr })
+  pcall(map.del, "n", "<Up>", { buffer = bufnr })
+  pcall(map.del, "n", "<Down>", { buffer = bufnr })
+  pcall(map.del, "n", "<Left>", { buffer = bufnr })
+  pcall(map.del, "n", "<Right>", { buffer = bufnr })
 end
 
 return M

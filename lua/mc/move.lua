@@ -45,7 +45,6 @@ local move = function(bufnr, id, dir)
 end
 
 return function(dir, bufnr)
-  P(dir, bufnr)
   if not stack[bufnr] then return end
 
   for id, _ in pairs(stack[bufnr]) do
