@@ -185,24 +185,38 @@ local DIR = {
 
 M.lock = function(bufnr)
 
+  local r = function(f)
+    local count = vim.v.count
+    count = count ~= 0 and count or 1
+    for _ = 1, count do f() end
+  end
+
   local up = function()
-    fn.cursor(fn.line(".") - 1, fn.col("."))
-    move(DIR.UP, bufnr)
+    r(function()
+      fn.cursor(fn.line(".") - 1, fn.col("."))
+      move(DIR.UP, bufnr)
+    end)
   end
 
   local down = function()
-    fn.cursor(fn.line(".") + 1, fn.col("."))
-    move(DIR.Down, bufnr)
+    r(function()
+      fn.cursor(fn.line(".") + 1, fn.col("."))
+      move(DIR.Down, bufnr)
+    end)
   end
 
   local right = function()
-    fn.cursor(fn.line("."), fn.col(".") + 1)
-    move(DIR.Right, bufnr)
+    r(function()
+      fn.cursor(fn.line("."), fn.col(".") + 1)
+      move(DIR.Right, bufnr)
+    end)
   end
 
   local left = function()
-    fn.cursor(fn.line("."), fn.col(".") - 1)
-    move(DIR.Left, bufnr)
+    r(function()
+      fn.cursor(fn.line("."), fn.col(".") - 1)
+      move(DIR.Left, bufnr)
+    end)
   end
 
   map.set("n", "k", up, { buffer = bufnr })
