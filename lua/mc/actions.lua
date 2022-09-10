@@ -185,56 +185,65 @@ local DIR = {
 
 M.lock = function(bufnr)
 
-  map.set("n", "k", function()
+  local up = function()
     fn.cursor(fn.line(".") - 1, fn.col("."))
     move(DIR.UP, bufnr)
-  end, { buffer = bufnr })
+  end
 
-  map.set("n", "j", function()
+  local down = function()
     fn.cursor(fn.line(".") + 1, fn.col("."))
     move(DIR.Down, bufnr)
-  end, { buffer = bufnr })
+  end
 
-  map.set("n", "l", function()
+  local right = function()
     fn.cursor(fn.line("."), fn.col(".") + 1)
     move(DIR.Right, bufnr)
-  end, { buffer = bufnr })
+  end
 
-  map.set("n", "h", function()
+  local left = function()
     fn.cursor(fn.line("."), fn.col(".") - 1)
     move(DIR.Left, bufnr)
-  end, { buffer = bufnr })
+  end
 
-  map.set("n", "<Up>", function()
-    fn.cursor(fn.line(".") - 1, fn.col("."))
-    move(DIR.UP, bufnr)
-  end, { buffer = bufnr })
+  map.set("n", "k", up, { buffer = bufnr })
+  map.set("n", "<Up>", up, { buffer = bufnr })
+  map.set("n", "<c-p>", up, { buffer = bufnr })
 
-  map.set("n", "<Down>", function()
-    fn.cursor(fn.line(".") + 1, fn.col("."))
-    move(DIR.Down, bufnr)
-  end, { buffer = bufnr })
+  map.set("n", "j", down, { buffer = bufnr })
+  map.set("n", "<Down>", down, { buffer = bufnr })
+  map.set("n", "<c-j>", down, { buffer = bufnr })
+  map.set("n", "<NL>", down, { buffer = bufnr })
+  map.set("n", "<c-n>", down, { buffer = bufnr })
 
-  map.set("n", "<Right>", function()
-    fn.cursor(fn.line("."), fn.col(".") + 1)
-    move(DIR.Right, bufnr)
-  end, { buffer = bufnr })
+  map.set("n", "l", right, { buffer = bufnr })
+  map.set("n", "<Right>", right, { buffer = bufnr })
+  map.set("n", "<Space>", right, { buffer = bufnr })
 
-  map.set("n", "<Left>", function()
-    fn.cursor(fn.line("."), fn.col(".") - 1)
-    move(DIR.Left, bufnr)
-  end, { buffer = bufnr })
+  map.set("n", "h", left, { buffer = bufnr })
+  map.set("n", "<Left>", left, { buffer = bufnr })
+  map.set("n", "<c-h>", left, { buffer = bufnr })
+  map.set("n", "<BS>", left, { buffer = bufnr })
 end
 
 M.unlock = function(bufnr)
   pcall(map.del, "n", "k", { buffer = bufnr })
-  pcall(map.del, "n", "j", { buffer = bufnr })
-  pcall(map.del, "n", "h", { buffer = bufnr })
-  pcall(map.del, "n", "l", { buffer = bufnr })
   pcall(map.del, "n", "<Up>", { buffer = bufnr })
+  pcall(map.del, "n", "<c-p>", { buffer = bufnr })
+
+  pcall(map.del, "n", "j", { buffer = bufnr })
   pcall(map.del, "n", "<Down>", { buffer = bufnr })
-  pcall(map.del, "n", "<Left>", { buffer = bufnr })
+  pcall(map.del, "n", "<c-j>", { buffer = bufnr })
+  pcall(map.del, "n", "<NL>", { buffer = bufnr })
+  pcall(map.del, "n", "<c-n>", { buffer = bufnr })
+
+  pcall(map.del, "n", "l", { buffer = bufnr })
   pcall(map.del, "n", "<Right>", { buffer = bufnr })
+  pcall(map.del, "n", "<Space>", { buffer = bufnr })
+
+  pcall(map.del, "n", "h", { buffer = bufnr })
+  pcall(map.del, "n", "<Left>", { buffer = bufnr })
+  pcall(map.del, "n", "<c-h>", { buffer = bufnr })
+  pcall(map.del, "n", "<BS>", { buffer = bufnr })
 end
 
 return M
