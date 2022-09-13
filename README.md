@@ -1,7 +1,6 @@
 # mc.nvim
 
 ## What Is MC?
-
 MC stands for Multiple Cursors.
 
 Basic usage:
