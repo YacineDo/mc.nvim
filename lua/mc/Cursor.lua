@@ -3,12 +3,34 @@ local utils = require "mc.Utils"
 local fn = vim.fn
 local api = vim.api
 
+local namespace         = api.nvim_create_namespace
+local set_extmark       = api.nvim_buf_set_extmark
+local del_extmark       = api.nvim_buf_del_extmark
+local get_extmark_by_id = api.nvim_buf_get_extmark_by_id
+local get_extmarks      = api.nvim_buf_get_extmarks
+local get_text          = api.nvim_buf_get_text
+local buf_call          = api.nvim_buf_call
+
 local Cursor = {}
 
-Cursor.ns = api.nvim_create_namespace('Cursor')
+Cursor.ns = namespace('Cursor')
 Cursor.__index = Cursor
 
-function Cursor:new(row, col, id, bufnr, active)
+local _stack = {}
+
+function Cursor:new(row, col, opt)
+  local id     = opt.id
+  local bufnr  = opt.bufnr
+  local active = opt.active
+
+  vim.validate {
+    id = { id, { "nil", "number" } },
+    row = { row, "number" },
+    col = { col, "number" },
+    bufnr = { bufnr, { "nil", "number" } },
+    active = { active, { "nil", "boolean" } },
+  }
+
   if not bufnr or bufnr == 0 then
     bufnr = fn.bufnr()
   end
@@ -17,13 +39,18 @@ function Cursor:new(row, col, id, bufnr, active)
     active = true
   end
 
-  vim.validate({
-    row = { row, "number" },
-    col = { col, "number" },
-    id = { id, { "number", "nil" } },
-    bufnr = { bufnr, "number" },
-    active = { active, "boolean" },
-  })
+  local row_len = buf_call(bufnr, utils.get_row_len)
+  if row < 0 or row > row_len then
+    error("Row Out of Range")
+  end
+
+  local col_len = buf_call(bufnr, function()
+    return utils.get_col_len(row)
+  end)
+
+  if col < 0 or col > col_len then
+    error("Column Out of Range")
+  end
 
   local cursor = {
     bufnr = bufnr,
@@ -37,38 +64,30 @@ function Cursor:new(row, col, id, bufnr, active)
 
   cursor:show()
 
+  _stack[bufnr] = _stack[bufnr] or {}
+  _stack[bufnr][cursor.id] = { active = active }
+
   return cursor
 end
 
-function Cursor:del(id, bufnr)
-  self.id = id or self.id
-  if not self.id then return end
+function Cursor:show(id, bufnr)
+  vim.validate {
+    id    = { id, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+  }
 
-  self.bufnr = bufnr or self.bufnr
-  if not self.bufnr or bufnr == 0 then
-    self.bufnr = fn.bufnr()
+  if id then
+    self = self:get_by_id(id, bufnr)
+    if not self then return nil end
   end
 
-  api.nvim_buf_del_extmark(self.bufnr, self.ns, self.id)
-
-  self.id = nil
-  self.row = nil
-  self.col = nil
-end
-
-function Cursor:show(id)
-  self.id = id or self.id
-
-  local char = api.nvim_buf_get_text(
+  local char = get_text(
     self.bufnr,
     self.row, self.col,
     self.row, self.col + 1, {})[1]
+  char = char ~= "" and char or " "
 
-  if not char or char == "" then
-    char = " "
-  end
-
-  self.id = api.nvim_buf_set_extmark(
+  self.id = set_extmark(
     self.bufnr, self.ns,
     self.row, self.col, {
     id = self.id,
@@ -80,58 +99,156 @@ function Cursor:show(id)
 end
 
 function Cursor:hide(id, bufnr)
-  self.id = id or self.id
-  self.bufnr = bufnr or self.bufnr
+  vim.validate {
+    id    = { id, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+  }
 
-  api.nvim_buf_del_extmark(self.bufnr, self.ns, self.id)
-end
-
-function Cursor:get_by_id(id, bufnr)
-  self.bufnr = bufnr or self.bufnr
-  self.id = id or self.id
-
-  if not self.bufnr or bufnr == 0 then
-    self.bufnr = fn.bufnr()
+  if id then
+    self = self:get_by_id(id, bufnr)
+    if not self then return nil end
   end
 
-  local cursor = api.nvim_buf_get_extmark_by_id(self.bufnr, self.ns, self.id, {})
-  if cursor then
-    self.id = cursor[1]
-    self.row = cursor[2]
-    self.col = cursor[3]
-  end
+  del_extmark(self.bufnr, self.ns, self.id)
 
   return self
 end
 
-function Cursor:get_by_pos(row, col, bufnr)
-  self.bufnr = bufnr or self.bufnr
-  if not self.bufnr or bufnr == 0 then
-    self.bufnr = fn.bufnr()
+function Cursor:next(count, id, bufnr)
+  vim.validate {
+    id    = { id, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+    count = { count, { "nil", "number" } },
+  }
+
+  id = id or self.id
+  if not id then return nil end
+
+  bufnr = bufnr or self.bufnr
+
+  local cursor = Cursor:get_by_id(id, bufnr)
+  if not cursor then return nil end
+
+  local next = get_extmarks(bufnr, self.ns,
+    { cursor.row, cursor.col }, -1, {})
+
+  count = count or 1
+  if count < 0 or count >= #next then
+    return nil
   end
 
-  return api.nvim_buf_get_extmarks(self.bufnr, self.ns, row, col, {})
+  id = next[count + 1][1]
+  return Cursor:get_by_id(id, bufnr)
+end
+
+function Cursor:prev(count, id, bufnr)
+  vim.validate {
+    id    = { id, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+    count = { count, { "nil", "number" } },
+  }
+
+  id = id or self.id
+  if not id then return nil end
+
+  bufnr = bufnr or self.bufnr
+
+  local cursor = Cursor:get_by_id(id, bufnr)
+  if not cursor then return nil end
+
+  local prev = get_extmarks(cursor.bufnr, self.ns,
+    0, { cursor.row, cursor.col }, {})
+
+  count = count or 1
+  if count < 0 or count >= #prev then
+    return nil
+  end
+
+  id = prev[#prev - count][1]
+  return Cursor:get_by_id(id, bufnr)
+end
+
+function Cursor:get_by_id(id, bufnr)
+  vim.validate {
+    id    = { id, { "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+  }
+
+  bufnr = bufnr or self.bufnr
+  if not bufnr or bufnr == 0 then
+    bufnr = fn.bufnr()
+  end
+
+  local pos = get_extmark_by_id(bufnr, self.ns, id, {})
+  if not pos then return nil end
+
+  local active
+  if _stack[bufnr] and _stack[bufnr][id] then
+    active = _stack[bufnr][id].active
+  end
+
+  return Cursor:new(pos[1], pos[2], id, bufnr, active)
+end
+
+function Cursor:get_by_pos(row, col, bufnr)
+  vim.validate {
+    row   = { row, { "nil", "number" } },
+    col   = { col, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+  }
+
+  bufnr = bufnr or self.bufnr
+  if not bufnr or bufnr == 0 then
+    bufnr = fn.bufnr()
+  end
+
+  local row_len = buf_call(bufnr, utils.get_row_len)
+  if row < 0 or row > row_len then return nil end
+
+  local col_len = buf_call(bufnr, function()
+    return utils.get_col_len(row)
+  end)
+  if col < 0 or col > col_len then return nil end
+
+  return get_extmarks(bufnr, self.ns, { row, col }, { row, col }, {})
 end
 
 function Cursor:update(row, col, id, bufnr)
-  self.id = id or self.id
-  self.bufnr = bufnr or self.bufnr
+  vim.validate {
+    row   = { row, { "nil", "number" } },
+    col   = { col, { "nil", "number" } },
+    id    = { id, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+  }
 
-  if not self.bufnr or bufnr == 0 then
-    self.bufnr = fn.bufnr()
+  if id then
+    self = Cursor:get_by_id(id, bufnr)
+    if not self then return nil end
   end
 
-  api.nvim_buf_del_extmark(self.bufnr, self.ns, self.id)
+  del_extmark(self.bufnr, self.ns, self.id)
 
   self.row = row or self.row
   self.col = col or self.col
+
+  local row_len = buf_call(self.bufnr, utils.get_row_len)
+  if self.row < 0 then self.row = 0 end
+  if self.row > row_len then self.row = row_len end
+
+  local col_len = buf_call(self.bufnr, function()
+    return utils.get_col_len(self.row)
+  end)
+  if self.col < 0 then self.col = 0 end
+  if self.col > col_len then self.col = col_len end
 
   return self:show()
 end
 
 function Cursor:move(dir, count, id, bufnr)
-  self.id = id or self.id
-  self.bufnr = bufnr or self.bufnr
+  if id then
+    self = Cursor:get_by_id(id, bufnr)
+    if not self then return end
+  end
 
   local col_copy = utils.copy(self.col)
 
@@ -169,23 +286,45 @@ function Cursor:move(dir, count, id, bufnr)
 end
 
 function Cursor:all(bufnr)
-  self.bufnr = bufnr or self.bufnr
-  if not self.bufnr or bufnr == 0 then
-    self.bufnr = fn.bufnr()
-  end
+  vim.validate {
+    bufnr = { bufnr, { "nil", "number" } },
+  }
 
-  return api.nvim_buf_get_extmarks(self.bufnr, self.ns, 0, -1, {})
+  bufnr = bufnr or self.bufnr
+  if not bufnr or bufnr == 0 then
+    bufnr = fn.bufnr()
+  end
+  return get_extmarks(bufnr, self.ns, 0, -1, {})
 end
 
 function Cursor:each(bufnr, cb)
-  local cursors = self:all(bufnr)
+  vim.validate {
+    bufnr = { bufnr, { "nil", "number" } },
+    cb    = { cb, { "function" } },
+  }
 
+  local cursors = Cursor:all(bufnr)
   for index, cursor in pairs(cursors) do
-    self.id  = cursor[1]
-    self.row = cursor[2]
-    self.col = cursor[3]
-    cb(self, index)
+    cb(Cursor:get_by_id(cursor[1], bufnr), index)
   end
+
+  return self
+end
+
+function Cursor:del(id, bufnr)
+  vim.validate {
+    id    = { id, { "nil", "number" } },
+    bufnr = { bufnr, { "nil", "number" } },
+  }
+
+  if id then
+    self = Cursor:get_by_id(id, bufnr)
+    if not self then return end
+  end
+
+  if not self.id then return nil end
+  _stack[bufnr][self.id] = nil
+  del_extmark(self.bufnr, self.ns, self.id)
 end
 
 function Cursor:clear(bufnr)
