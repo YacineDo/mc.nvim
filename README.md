@@ -4,7 +4,31 @@
 MC stands for Multiple Cursors. 
 MC is a plugin that adds a bunch of virtual cursors into `Neovim`, writing in `Lua`
 
-Basic usage:
+## Getting Started
+
+This section should guide you to run MC on your `Neovim`.
+
+### Installation
+
+Using [vim-plug](https://github.com/junegunn/vim-plug)
+
+```viml
+Plug 'YacineDo/mc.nvim'
+```
+
+Using [dein](https://github.com/Shougo/dein.vim)
+
+```viml
+call dein#add('YacineDo/mc.nvim')
+```
+
+Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+
+```lua
+use 'YacineDo/mc.nvim'
+```
+
+### Basic usage:
 
 - select words with <kbd>Ctrl-N</kbd> (like `Ctrl-d` in Sublime Text/VS Code)
 - create cursors vertically with <kbd>Ctrl-Down</kbd>/<kbd>Ctrl-Up</kbd>
