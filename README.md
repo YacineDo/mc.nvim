@@ -1,7 +1,8 @@
 # mc.nvim
 
 ## What Is MC?
-MC stands for Multiple Cursors.
+MC stands for Multiple Cursors. 
+MC is a plugin that adds a bunch of virtual cursors into `Neovim`, writing in `Lua`
 
 Basic usage:
 
