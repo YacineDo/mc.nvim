@@ -71,6 +71,8 @@ vim.schedule(function()
   -- c1:update(nil, 1)
   -- c2:update(2, nil)
 
+  -- c2:del(2, nil)
+
 end)
 
 
