@@ -10,7 +10,6 @@ vim.schedule(function()
   local c3 = Cursor:new(2, 0)
   local c4 = Cursor:new(3, 0)
 
-
   -- c1:hide()
   -- c1:show()
 
@@ -59,14 +58,16 @@ vim.schedule(function()
     -- local col = cursor.col
     -- P(id, row, col, index)
 
-    -- cursor
-    --     :move("right", 4)
-    --     :move("down", 2)
+    cursor:move("right", 4)
     --     :move("down", 10)
     --     :move("left", 1)
     --     :move("down", 4)
     --     :move("right", 10)
   end)
+  Cursor:each(0, function(cursor)
+    cursor:move("down", 2)
+  end)
+  -- P(Cursor:all())
 
   -- c1:update(nil, 1)
   -- c2:update(2, nil)

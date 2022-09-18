@@ -9,7 +9,8 @@ M.ns = api.nvim_create_namespace('MC-Mode')
 M.stack = {}
 
 M.setup = function()
-  require "mc.ucmd".init()
+  -- require "mc.ucmd".init()
+  require "mc.user_command".init()
   require "mc.highlight".create_highlight_groups()
 end
 

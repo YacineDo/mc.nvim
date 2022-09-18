@@ -14,14 +14,18 @@ local buf_call          = api.nvim_buf_call
 local Cursor = {}
 
 Cursor.ns = namespace('Cursor')
+Cursor.stack = {}
 Cursor.__index = Cursor
 
 local _stack = {}
 
 function Cursor:new(row, col, opt)
-  local id     = opt.id
-  local bufnr  = opt.bufnr
-  local active = opt.active
+  opt = opt or {}
+
+  local id       = opt.id
+  local bufnr    = opt.bufnr
+  local curswant = opt.curswant
+  local active   = opt.active
 
   vim.validate {
     id = { id, { "nil", "number" } },
@@ -53,11 +57,12 @@ function Cursor:new(row, col, opt)
   end
 
   local cursor = {
-    bufnr = bufnr,
-    row = row,
-    col = col,
-    id = id,
-    active = active,
+    id       = id,
+    bufnr    = bufnr,
+    row      = row,
+    col      = col,
+    curswant = curswant or col,
+    active   = active,
   }
 
   setmetatable(cursor, self)
@@ -65,7 +70,10 @@ function Cursor:new(row, col, opt)
   cursor:show()
 
   _stack[bufnr] = _stack[bufnr] or {}
-  _stack[bufnr][cursor.id] = { active = active }
+  _stack[bufnr][cursor.id] = {
+    curswant = col,
+    active = active
+  }
 
   return cursor
 end
@@ -182,12 +190,17 @@ function Cursor:get_by_id(id, bufnr)
   local pos = get_extmark_by_id(bufnr, self.ns, id, {})
   if not pos then return nil end
 
-  local active
-  if _stack[bufnr] and _stack[bufnr][id] then
-    active = _stack[bufnr][id].active
-  end
+  local row      = pos[1]
+  local col      = pos[2]
+  local curswant = _stack[bufnr][id].curswant
+  local active   = _stack[bufnr][id].active
 
-  return Cursor:new(pos[1], pos[2], id, bufnr, active)
+  return Cursor:new(row, col, {
+    id       = id,
+    bufnr    = bufnr,
+    curswant = curswant,
+    active   = active,
+  })
 end
 
 function Cursor:get_by_pos(row, col, bufnr)
@@ -213,7 +226,7 @@ function Cursor:get_by_pos(row, col, bufnr)
   return get_extmarks(bufnr, self.ns, { row, col }, { row, col }, {})
 end
 
-function Cursor:update(row, col, id, bufnr)
+function Cursor:update(row, col, id, bufnr, active)
   vim.validate {
     row   = { row, { "nil", "number" } },
     col   = { col, { "nil", "number" } },
@@ -228,8 +241,11 @@ function Cursor:update(row, col, id, bufnr)
 
   del_extmark(self.bufnr, self.ns, self.id)
 
-  self.row = row or self.row
-  self.col = col or self.col
+  self.row    = row or self.row
+  self.col    = col or self.col
+  self.active = active or self.active
+
+  -- P(":update()", self.col, _stack[self.bufnr])
 
   local row_len = buf_call(self.bufnr, utils.get_row_len)
   if self.row < 0 then self.row = 0 end
@@ -241,6 +257,12 @@ function Cursor:update(row, col, id, bufnr)
   if self.col < 0 then self.col = 0 end
   if self.col > col_len then self.col = col_len end
 
+  -- _stack[self.bufnr] = _stack[self.bufnr] or {}
+  _stack[self.bufnr][self.id] = {
+    curswant = self.curswant,
+    active   = self.active
+  }
+
   return self:show()
 end
 
@@ -250,39 +272,46 @@ function Cursor:move(dir, count, id, bufnr)
     if not self then return end
   end
 
-  local col_copy = utils.copy(self.col)
+  self.col = utils.copy(self.curswant)
 
-  if dir == "up" then
+  if dir == "k" or dir == "up" then
     self.row = self.row - count
+    self.col = self.curswant
   end
 
-  if dir == "down" then
+  if dir == "j" or dir == "down" then
     self.row = self.row + count
+    self.col = self.curswant
   end
 
-  if dir == "right" then
+  if dir == "l" or dir == "right" then
     self.col = self.col + count
   end
 
-  if dir == "left" then
+  if dir == "h" or dir == "left" then
     self.col = self.col - count
   end
 
-  local row_len = fn.line "$" - 1
-  self.row = self.row > row_len and row_len or self.row
-  self.row = self.row < 0 and 0 or self.row
+  if dir == "h" or dir == "l" or dir == "right" or dir == "left" then
 
-  local col_len = fn.col { self.row + 1, "$" } - 1
-  self.col = self.col > col_len and col_len or self.col
-  self.col = self.col < 0 and 0 or self.col
+    local col_len = buf_call(self.bufnr, function()
+      return utils.get_col_len(self.row)
+    end)
 
-  self:update()
+    if self.col < 0 then
+      self.col = 0
+    end
 
-  if dir == "up" or dir == "down" then
-    self.col = col_copy
+    if self.col > col_len then
+      self.col = col_len
+    end
+
+    self.curswant = self.col
   end
 
-  return self
+  P(":move()", self.row, self.col, self.curswant)
+
+  return self:update()
 end
 
 function Cursor:all(bufnr)
@@ -294,18 +323,25 @@ function Cursor:all(bufnr)
   if not bufnr or bufnr == 0 then
     bufnr = fn.bufnr()
   end
-  return get_extmarks(bufnr, self.ns, 0, -1, {})
+
+  local extmarks = get_extmarks(bufnr, self.ns, 0, -1, {})
+
+  return extmarks
 end
 
 function Cursor:each(bufnr, cb)
   vim.validate {
     bufnr = { bufnr, { "nil", "number" } },
-    cb    = { cb, { "function" } },
+    cb    = { cb, "function" },
   }
 
-  local cursors = Cursor:all(bufnr)
-  for index, cursor in pairs(cursors) do
-    cb(Cursor:get_by_id(cursor[1], bufnr), index)
+  local cs = Cursor:all(bufnr)
+  for index, c in pairs(cs) do
+    local id = c[1]
+    local cursor = Cursor:get_by_id(id, bufnr)
+    if cursor then
+      cb(cursor, index)
+    end
   end
 
   return self

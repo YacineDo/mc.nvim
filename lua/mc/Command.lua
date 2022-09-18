@@ -25,19 +25,16 @@ function Command:new(mode, key, bufnr)
   return command
 end
 
-function Command:set(cb)
+function Command:active(cb)
   vim.keymap.set(self.mode, self.key, function()
     local count = vim.b.count
     self.clean = cb(self, count, self.mode, self.key)
   end, { buffer = self.bufnr })
 end
 
-function Command:del()
-  if type(self.clean) == "function" then
-    self.clean()
-  end
-
-  vim.keymap.del(self.mode, self.key, { buffer = self.bufnr })
+function Command:inactive()
+  pcall(self.clean)
+  pcall(vim.keymap.del, self.mode, self.key, { buffer = self.bufnr })
 end
 
 return Command
